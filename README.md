@@ -1,262 +1,468 @@
-# AI Resume Screening System
+<div align="center">
 
-Explainable resume screening: upload a job description and many resumes, get ranked
-candidates with the **matched and missing skills** behind every score.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:F59E0B,100:171717&height=200&section=header&text=Resume%20Screening&fontSize=58&fontColor=ffffff&fontAlignY=38&desc=Ranked%20candidates,%20and%20the%20reason%20for%20every%20score.&descAlignY=58&descSize=18" width="100%"/>
 
-**Status: Phases 1 and 2 complete; Phase 3 in progress.** Screening runs asynchronously
-on Celery workers, the React frontend is wired up, and the API is token-protected.
-GitHub Actions CI is still to do.
+<br/>
 
-## How scoring works
+<p align="center">
+  <img src="https://img.shields.io/badge/Python_3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/Celery-37814A?style=for-the-badge&logo=celery&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL_+_pgvector-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
+</p>
 
-```
-skill_score    = |matched_skills| / |required_skills|              # keyword layer
-semantic_score = cosine_similarity(jd_embedding, resume_embedding) # context layer
-final_score    = W_SKILL * skill_score + W_SEMANTIC * semantic_score
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/spaCy-09A3D5?style=for-the-badge&logo=spacy&logoColor=white" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+</p>
 
-Weights come from `.env` (`W_SKILL=0.6`, `W_SEMANTIC=0.4`) and must sum to 1.0 — this
-is validated at startup. All scores are reported on a 0-100 scale. Both layers are
-required: keyword matching alone misses paraphrased experience, embeddings alone miss
-hard requirements.
+<p align="center">
+  <img src="https://img.shields.io/badge/Tests-382_passing-brightgreen?style=flat-square" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Skills_dictionary-213-F59E0B?style=flat-square" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Embeddings-all--MiniLM--L6--v2-8B5CF6?style=flat-square" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/Explainable-every_score-0EA5E9?style=flat-square" />
+</p>
 
-## Layout
+<br/>
 
-```
-├── pyproject.toml           # deps, ruff, black, pytest config
-├── docker-compose.yml       # postgres 16 (pgvector), redis, minio, api, worker
-├── docker/app.Dockerfile    # shared image for api + worker
-├── alembic.ini / migrations # schema, incl. pgvector HNSW cosine indexes
-├── config/skills.txt        # skills dictionary (editable; supports aliases)
-├── seed_data/               # generated sample JD + resumes
-├── scripts/seed.py          # generate seed data, optionally submit it
-├── src/app/
-│   ├── main.py              # FastAPI app factory
-│   ├── core/                # settings (Pydantic), structlog setup
-│   ├── api/routes/          # health.py, jobs.py
-│   ├── db/                  # async session (API) + sync session (worker)
-│   ├── models/              # jobs, candidates, scoring_runs, scores
-│   ├── schemas/             # request/response models
-│   ├── services/            # extraction, skills, resume_parser,
-│   │                        # embeddings, scoring, storage, screening
-│   └── worker/              # celery_app.py, tasks.py (background screening)
-├── frontend/                # React + Vite + TypeScript (see frontend/README.md)
-└── tests/
-```
+<h3>🔍 Two-Layer Scoring &nbsp;·&nbsp; ⚡ Async Workers &nbsp;·&nbsp; 🧬 Cached Embeddings &nbsp;·&nbsp; 🛡️ Failure Isolation</h3>
 
-## Setup
+<br/>
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python -m spacy download en_core_web_sm    # separate download, not a pip dep
-cp .env.example .env
-```
+</div>
 
-## Run
+---
 
-### Everything in containers
+## 💡 What is this?
 
-```bash
-docker compose up -d --build    # postgres, redis, minio, api, worker, frontend
-docker compose ps               # wait for everything to report healthy
-```
+> **A recruiter with 200 resumes and one afternoon does not need a number. They need to know *why* that number.**
 
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:3000 |
-| API docs | http://localhost:8000/docs |
-| MinIO console | http://localhost:9001 |
+This is a decision-support tool, not a filter. It takes one job description and many resumes, then ranks every candidate with **two independent signals** and shows the working: which required skills they have, which they are missing, and how much of the score came from each layer.
 
-The first build takes several minutes: it installs CPU-only torch and bakes the spaCy
-and sentence-transformers models into the image so containers start offline.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-### Running the API and worker locally
+<b>Keyword-only screening</b> ❌
 
-Both are needed — with no worker running, jobs stay `queued` forever.
+<ul>
+<li>Misses "built REST services in Django" for a JD asking for backend frameworks</li>
+<li>A resume stuffed with the JD's words wins</li>
+<li>Recruiter sees a score with no reasoning</li>
+</ul>
 
-```bash
-docker compose up -d postgres redis minio   # infrastructure only
-alembic upgrade head
+</td>
+<td width="50%" valign="top">
 
-# terminal 1 — the worker
-celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+<b>This system</b> ✅
 
-# terminal 2 — the API
-uvicorn app.main:app --reload
-```
+<ul>
+<li>Keyword layer catches hard requirements</li>
+<li>Semantic layer catches paraphrased experience</li>
+<li>Every score ships with matched and missing skills</li>
+<li>A corrupt file fails alone — the batch still ranks</li>
+</ul>
 
-And the frontend dev server:
+</td>
+</tr>
+</table>
+
+---
+
+## 🎬 The 60-second version
 
 ```bash
-cd frontend && npm install && npm run dev   # http://localhost:5173
-```
-
-Useful worker commands:
-
-```bash
-celery -A app.worker.celery_app.celery_app inspect ping     # is a worker alive?
-celery -A app.worker.celery_app.celery_app inspect active   # what is running now
-celery -A app.worker.celery_app.celery_app inspect stats    # pool size, totals
-```
-
-Then generate sample data and screen it end to end:
-
-```bash
-python scripts/seed.py --submit
+docker compose up -d --build       # postgres · redis · minio · api · worker · frontend
+python scripts/seed.py --submit    # generates 5 sample resumes + 1 deliberately corrupt, screens them
 ```
 
 ```
-job_id: 405b15a1-...  status: queued
-  status=completed  6/6 resumes  (100%)
+POST /jobs (6 files) -> queued in 0.36s
+finished in 2.33s -> completed  5 ok, 1 failed
 
-Rank  Candidate          Final   Skill  Semantic  Matched
-1     Priya Sharma       76.88   81.25     70.31  AWS, Celery, Distributed Systems, Django
-2     Sara Khan          48.95   43.75     56.75  AWS, Docker, Machine Learning, NLP
-3     Arjun Mehta        42.11   25.00     67.78  Docker, PostgreSQL, Python, SQL
-4     Deepak Nair        34.26   25.00     48.15  AWS, Docker, Kubernetes, Redis
-5     Ravi Kumar         21.42    0.00     53.55  -
+#  Candidate        Final  Skill  Semantic   Matched
+1  Priya Sharma     76.88  81.25     70.31   AWS, Celery, Distributed Systems
+2  Sara Khan        48.95  43.75     56.75   AWS, Docker, Machine Learning
+3  Arjun Mehta      42.11  25.00     67.78   Docker, PostgreSQL, Python
+4  Deepak Nair      34.26  25.00     48.15   AWS, Docker, Kubernetes
+5  Ravi Kumar       21.42   0.00     53.55   —
 
 FAILED  corrupt_resume.pdf: Could not read PDF: Failed to open stream
 ```
 
-## Auth
+**Look at rows 2 and 3.** Arjun's *semantic* score is higher — his resume reads like the JD. Sara's *skill* score is higher — she actually has more of the listed technologies. The weighted combination puts Sara ahead. Neither layer alone gets that ordering right, which is the entire argument for having both.
 
-The job endpoints require a static bearer token; `/health` stays public.
+Open **http://localhost:3000** and try the same resumes against a Frontend JD — Ravi goes from last to first.
 
-```bash
-# generate a key
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+---
 
-# put it in .env
-API_KEY=<the key>
+## 🔄 How a job actually flows
 
-curl -H "Authorization: Bearer $API_KEY" localhost:8000/jobs/<job_id>
+```mermaid
+flowchart TD
+    A[📤 Recruiter uploads<br/>JD + N resumes] --> B[✅ Validate<br/>type · size · non-empty]
+    B -->|bad file| R1[400 / 413 rejected at upload]
+    B --> C[🪣 Store raw files<br/>MinIO / S3]
+    C --> D[📝 Job = queued<br/>Candidates = pending]
+    D --> E[📨 Dispatch Celery task]
+    E --> F[↩️ Return job_id immediately]
+
+    E --> G[⚙️ Worker picks up]
+    G --> H[📄 Per resume: extract text<br/>PyMuPDF / python-docx]
+    H -->|corrupt · scanned · empty| I[⚠️ Candidate = failed<br/>batch continues]
+    H --> J[🏷️ Skills · name · education · experience<br/>spaCy PhraseMatcher]
+    J --> K[🧬 Batch embed<br/>all-MiniLM-L6-v2]
+    K --> L[📐 Score + rank<br/>0.6 skill + 0.4 semantic]
+    L --> M[💾 ScoringRun + Scores<br/>vectors cached in pgvector]
+
+    F -.poll.-> N[📊 GET /jobs/id<br/>live progress]
+    M --> O[🏆 GET /jobs/id/results]
+    O --> P[🔁 POST /rerank<br/>new JD, cached vectors]
+
+    H -.-> AU[(📋 structlog<br/>audit trail)]
+    L -.-> AU
+    I -.-> AU
 ```
 
-Leave `API_KEY` unset for local development and auth is off — but the app **refuses to
-start** with `APP_ENV=staging` or `production` and no key, so an unprotected deploy is
-not something you can do by forgetting.
+The worker **commits after every resume**, so `processed_resumes / total_resumes` climbs while the batch runs rather than jumping at the end. There is a test that fails if that commit ever moves outside the loop.
 
-A static key rather than JWT: there is no user model here, so a signed token would add
-expiry, rotation and clock handling without carrying any claim a shared secret does not.
-Comparison is constant-time (`secrets.compare_digest`).
+---
 
-In the browser the key is entered once and kept in that browser's `localStorage`. It is
-deliberately not a build-time variable — anything baked into the bundle is readable by
-everyone who loads the page.
+## 📐 The scoring engine
 
-## API
+```
+skill_score    = |matched_skills| / |required_skills|              # keyword layer
+semantic_score = cosine(jd_embedding, resume_embedding)            # context layer
+final_score    = W_SKILL × skill_score + W_SEMANTIC × semantic_score
+```
 
-| Method | Path | Purpose |
+Weights come from the environment (`W_SKILL=0.6`, `W_SEMANTIC=0.4`) and are validated to sum to 1.0 **at startup** — a typo fails the boot, not the ranking. Scores are reported 0–100.
+
+<div align="center">
+
+| Decision | Choice | Why |
+|:---|:---|:---|
+| Negative cosine | **Clamp to 0** | Rescaling `(sim+1)/2` would hand an unrelated resume a free 50 |
+| JD yields no skills | **skill_score = 0 for everyone** | No division by zero, relative order preserved, falls back to semantics |
+| Ties | **Deterministic key order** | Same input, same ranking, every run |
+
+</div>
+
+---
+
+## ✨ Feature highlights
+
+<details>
+<summary><b>📄 Resume parsing — where most of the hard problems live</b></summary>
+
+<br/>
+
+| Feature | What it does |
+|---|---|
+| 🗂️ **Multi-column PDFs** | Reconstructs reading order from line bounding boxes — PyMuPDF returns drawing order, which interleaves columns |
+| 📅 **Date-rail guard** | A right-aligned date column must *not* be treated as a second column, or every date detaches from its job |
+| 📊 **Table extraction** | Ruled PDF tables and DOCX tables become structured rows — skills and dates routinely live there |
+| 👤 **Name extraction** | Position-first, spaCy NER second, filename third |
+| 🎓 **Education & experience** | Degree patterns, date ranges, `is_current` detection |
+| 🧯 **Typed failures** | `UnsupportedFileType` · `CorruptFile` · `EmptyDocument` — never a silent empty string |
+
+</details>
+
+<details>
+<summary><b>🏷️ Skill extraction</b></summary>
+
+<br/>
+
+| Feature | What it does |
+|---|---|
+| 📚 **213 curated skills** | 272 aliases across languages, frameworks, cloud, data/ML, QA, tools, soft skills |
+| 🔗 **Alias folding** | A resume saying `postgres` and a JD saying `PostgreSQL` resolve to one canonical skill |
+| 🔡 **Case-sensitive guards** | 19 ambiguous terms match only on exact casing — see below |
+| 📎 **Overlay dictionary** | `EXTRA_SKILLS_PATH` adds in-house terms without forking the curated list |
+| ⚡ **Compiled once** | PhraseMatcher built per process, not per request |
+
+</details>
+
+<details>
+<summary><b>⚡ Async pipeline & resilience</b></summary>
+
+<br/>
+
+| Feature | What it does |
+|---|---|
+| 📨 **Celery + Redis** | `POST /jobs` returns in ~0.4s for a 6-file batch; 100+ resumes never time out |
+| 📊 **Live progress** | Committed per resume, so polling shows real movement |
+| 🛡️ **Per-resume isolation** | Corrupt, scanned, or text-free files fail alone and are reported under `failures` |
+| 🔁 **Typed retries** | Transient faults (DB restart, storage blip) retry with exponential backoff; a bad resume never does |
+| 🧠 **Model loaded once per worker process** | Preloaded in `worker_process_init`, asserted by a test that counts constructions |
+| 📋 **Structured logs** | `job_id` + `task_id` on every event, JSON in containers |
+
+</details>
+
+<details>
+<summary><b>🧬 Re-ranking on cached vectors</b></summary>
+
+<br/>
+
+| Feature | What it does |
+|---|---|
+| 💾 **pgvector storage** | Resume embeddings persist with an HNSW cosine index |
+| 1️⃣ **One embedding call** | Only the new JD is embedded — cost is flat in candidate count |
+| 📜 **Versioned runs** | Every rerank writes a new `ScoringRun`; earlier rankings stay queryable |
+| ⚡ **~0.2s vs ~1.5s** | Measured against the full screening path on the same batch |
+
+</details>
+
+---
+
+## 🎯 The false positives worth knowing about
+
+Precision problems in a hiring tool are not cosmetic. A wrong skill in the **JD** poisons *every* candidate's score at once — so the guards lean hard toward silence.
+
+<div align="center">
+
+| Input | Naive result | What this does |
+|:---|:---|:---|
+| `"We are hiring a backend engineer"` | `Hiring` becomes a required skill | ❌ Rejected — case-guarded |
+| `"go to market strategy"` | Matches the **Go** language | ❌ Rejected — short aliases need exact case |
+| `"vitamin c supplements"` | Matches **C** | ❌ Rejected |
+| `"there is slack in the deadlines"` | Matches **Slack** the tool | ❌ Rejected |
+| `"cucumber salad"` | Matches **Cucumber** the BDD tool | ❌ Rejected |
+| `"linear algebra"` | Matched a project tool | ❌ Removed from the dictionary entirely |
+| `"Daily standups run in Slack"` | — | ✅ Matches, correctly |
+
+</div>
+
+> ⚠️ **The trade-off is stated honestly:** case-sensitivity costs recall. A resume saying *"led hiring and mentoring"* in lowercase will miss the `Hiring` skill. That is deliberate — a false positive in the JD misjudges the whole batch, a false negative on one resume costs one candidate a fraction of one score.
+
+---
+
+## ⚖️ A fairness bug worth calling out
+
+`en_core_web_sm` recognises **"Priya Sharma"** as a PERSON. It does **not** recognise **"Deepak Nair"** — no entity at all. With NER as the primary signal, extraction then fell through to a job title further down the page, and the results table showed a candidate called **"Platform Engineer"**.
+
+Two failures stacked: a job title accepted as a name, and name extraction that worked or didn't **depending on the origin of the candidate's name**. In a hiring tool that is not an edge case, it is the bug.
+
+**The fix inverts the priority.** Position leads — on essentially every resume the name is the first real line — with NER as a fallback and the filename last. A 60-word blocklist rejects role words and document boilerplate (`engineer`, `manager`, `curriculum`, `vitae`). Extraction no longer depends on what a model was trained to recognise.
+
+```
+priya_sharma.pdf  -> 'Priya Sharma'      deepak_nair.pdf  -> 'Deepak Nair'
+arjun_mehta.docx  -> 'Arjun Mehta'       sara_khan.pdf    -> 'Sara Khan'
+```
+
+---
+
+## 🧯 When things break
+
+<div align="center">
+
+| Failure | Caught where | What happens |
+|:---|:---:|:---|
+| 📄 Unsupported type, empty, oversized | API | `400` / `413` — never queued |
+| 💥 Corrupt bytes | Worker | That candidate fails, batch continues |
+| 🖼️ Scanned / image-only PDF | Worker | `EmptyDocument` with a reason the recruiter can read |
+| 🪣 Object storage down at upload | API | `503` — the job is refused rather than queued to certainly fail |
+| 🔌 Broker unreachable | API | `503`, job marked failed, never silently accepted |
+| 🗄️ DB restart mid-task | Worker | Retries `5s → 10s → 20s`, then marks the job failed |
+
+</div>
+
+Every resume in a batch can fail and the job still reaches `completed` — with an empty result set, the JD's required skills, and one failure line per file.
+
+---
+
+## 🛠️ Tech stack
+
+<div align="center">
+
+| Layer | Technology | Purpose |
 |---|---|---|
-| `POST` | `/jobs` | multipart: `jd_text` or `jd_file`, plus `resumes` files. Returns `job_id`. |
-| `GET` | `/jobs/{job_id}` | Status and `processed / total` progress. |
-| `GET` | `/jobs/{job_id}/results` | Ranked candidates with score breakdown and skills. |
-| `POST` | `/jobs/{job_id}/rerank` | Re-score against a new JD using cached embeddings. |
-| `GET` | `/health` | Liveness check. **Public.** |
+| 🐍 API | FastAPI · Pydantic v2 · Uvicorn | Typed endpoints, validation at the edge |
+| ⚙️ Workers | Celery · Redis | Background screening, retries, progress |
+| 🗄️ Database | PostgreSQL 16 · pgvector · SQLAlchemy 2 · Alembic | Rows plus 384-dim vectors, HNSW cosine index |
+| 🧬 Embeddings | sentence-transformers `all-MiniLM-L6-v2` | Semantic similarity, CPU-pinned |
+| 🏷️ NLP | spaCy `en_core_web_sm` · PhraseMatcher | Skill and entity extraction |
+| 📄 Parsing | PyMuPDF · python-docx | PDF and DOCX text, tables, layout |
+| 🪣 Storage | MinIO locally, AWS S3 in deployment | Raw uploads, identical config both ways |
+| ⚛️ Frontend | React 18 · Vite · TypeScript · three.js | Upload → poll → sortable results |
+| 📋 Logging | structlog | JSON events keyed by `job_id` |
+| 🧪 Tests | pytest · pytest-asyncio · httpx | 382 across 14 files |
 
-`POST /jobs` stores the uploads, writes `queued` rows, dispatches a Celery task and
-returns — it never waits for processing. Poll `GET /jobs/{id}` for progress; the worker
-commits after each resume, so `processed_resumes` climbs while the batch runs.
+</div>
 
-`POST /jobs/{id}/rerank` re-scores the existing candidates against a new JD using their
-cached pgvector embeddings. It never re-parses, never re-reads object storage and never
-re-embeds a resume — the only new work is embedding the JD once, so the cost is flat in
-the number of candidates. On the sample batch that is ~0.2s against ~1.5s for the
-initial screening. Each rerank writes a new `scoring_run`, so earlier rankings stay
-queryable.
+---
+
+## 🚀 Getting started
+
+### Everything in containers
+
+```bash
+git clone https://github.com/rohan1460/Ai-resume-screening-system.git
+cd Ai-resume-screening-system
+
+cp .env.example .env
+docker compose up -d --build
+docker compose ps                  # wait for all six to report healthy
+```
+
+| Service | URL |
+|---|---|
+| 🖥️ Frontend | http://localhost:3000 |
+| 📡 API docs | http://localhost:8000/docs |
+| 🪣 MinIO console | http://localhost:9001 |
+
+> The first build takes a few minutes: it installs CPU-only torch and **bakes the spaCy and sentence-transformers models into the image**, so containers start offline and never download per process.
+
+### Running it locally
+
+```bash
+docker compose up -d postgres redis minio     # infrastructure only
+
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+python -m spacy download en_core_web_sm       # separate download, not a pip dependency
+alembic upgrade head
+
+# terminal 1 — the worker (without it, jobs stay queued forever)
+celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=2
+
+# terminal 2 — the API
+uvicorn app.main:app --reload
+
+# terminal 3 — the UI
+cd frontend && npm install && npm run dev      # http://localhost:5173
+```
+
+### Try it
+
+```bash
+python scripts/seed.py --submit    # generate samples, screen them, print the ranking
+./scripts/demo.sh                  # the same flow in plain curl
+pytest                             # 382 tests
+```
+
+The UI ships five sample JDs — **Backend, Frontend, Full Stack, AI/ML, QA** — so you can run the same resumes against five roles and watch the ranking reorder.
+
+---
+
+## 📡 API
+
+<div align="center">
+
+| Method | Endpoint | Description |
+|:---:|---|---|
+| `POST` | `/jobs` | Multipart: `jd_text` or `jd_file` + `resumes[]`. Returns `job_id`, status `queued`. |
+| `GET` | `/jobs/{id}` | Status and `processed / total` progress |
+| `GET` | `/jobs/{id}/results` | Ranked candidates with breakdown, matched and missing skills |
+| `POST` | `/jobs/{id}/rerank` | Re-score against a new JD using cached embeddings |
+| `GET` | `/health` | Liveness — **public** |
+
+</div>
 
 ```bash
 curl -X POST localhost:8000/jobs \
-  -F "jd_text=Backend engineer with Python, FastAPI, PostgreSQL, Docker" \
+  -H "Authorization: Bearer $API_KEY" \
+  -F "jd_text=$(cat seed_data/job_description.txt)" \
   -F "resumes=@seed_data/resumes/priya_sharma.pdf" \
   -F "resumes=@seed_data/resumes/ravi_kumar.docx"
 
-curl localhost:8000/jobs/<job_id>/results
-
-curl -X POST localhost:8000/jobs/<job_id>/rerank \
-  -H "Content-Type: application/json" \
-  -d '{"jd_text":"Frontend engineer with React, TypeScript, CSS"}'
+curl -H "Authorization: Bearer $API_KEY" localhost:8000/jobs/<job_id>/results
 ```
 
-## Tests
+### 🔒 Auth
+
+A static bearer token protects the job endpoints; `/health` stays public.
 
 ```bash
-pytest              # 382 tests (backend)
-ruff check .
-black --check .
-
-cd frontend && npm run build && npm run lint && npm run format:check
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # put it in .env as API_KEY
 ```
 
-Integration tests need Postgres running; they create and manage their own
-`resume_screening_test` database. Embeddings and object storage are stubbed there for
-speed and determinism — the real model is exercised by `scripts/seed.py --submit`.
+Leave `API_KEY` unset locally and auth is off. With `APP_ENV=staging` or `production` the app **refuses to start** without one — an unprotected deploy is not something you can do by forgetting. The same guard rejects the local-dev database and storage passwords outside `local`.
 
-## Logging
+A static key rather than JWT: there is no user model here, so a signed token would add expiry, rotation and clock handling without carrying a single claim a shared secret does not. Comparison is constant-time.
 
-`structlog` throughout; set `LOG_JSON=true` for machine-readable output (the containers
-do). Every task log carries `job_id` and `task_id`, so one job's whole lifecycle is a
-single filter:
+---
+
+## 📂 Project structure
 
 ```
-job.queued        job_id total_resumes
-job.started       job_id total_resumes
-resume.processed  job_id filename candidate_id position of skills_found chars_extracted duration_ms
-resume.failed     job_id filename candidate_id position of error duration_ms
-job.completed     job_id processed failed total duration_ms
-job.retrying      job_id error retry_in
-job.failed        job_id (with traceback)
+Ai-resume-screening-system/
+│
+├── src/app/
+│   ├── api/routes/         # 📡 health.py · jobs.py
+│   ├── core/               # ⚙️ settings · structlog · bearer auth
+│   ├── db/                 # 🗄️ async session (API) + sync session (worker)
+│   ├── models/             # 📐 jobs · candidates · scoring_runs · scores
+│   ├── services/
+│   │   ├── extraction.py   #    📄 PDF/DOCX, multi-column, tables
+│   │   ├── skills.py       #    🏷️ PhraseMatcher + ambiguity guards
+│   │   ├── resume_parser.py#    👤 name · education · experience
+│   │   ├── embeddings.py   #    🧬 model singleton, one per process
+│   │   ├── scoring.py      #    📐 pure maths — no I/O, no model
+│   │   └── storage.py      #    🪣 S3-compatible client
+│   └── worker/             # ⚡ celery_app.py · tasks.py
+│
+├── frontend/src/           # ⚛️ React UI — create → progress → results → rerank
+├── config/skills.txt       # 📚 213 skills, editable, alias syntax
+├── migrations/             # 🗄️ Alembic, incl. pgvector HNSW indexes
+├── scripts/                # 🎬 seed.py · demo.sh
+├── tests/                  # ✅ 382 tests across 14 files
+└── docker-compose.yml      # 🐳 postgres · redis · minio · api · worker · frontend
 ```
 
-## Retries
+---
 
-Transient infrastructure faults — `OperationalError`, `StorageError`, botocore errors —
-are retried with exponential backoff (`CELERY_RETRY_BACKOFF * 2^attempt`, default 5s →
-10s → 20s), up to `CELERY_MAX_RETRIES`. When they run out the job is marked `failed`
-with the reason.
+## 🧪 On the tests
 
-A bad *resume* is never retried: it would fail identically every time and burn the
-backoff budget. Those are isolated per candidate instead.
+382 tests, and a few are worth singling out because they exist to catch a *specific* regression rather than to raise a number:
 
-## Error handling
+- **`test_progress_is_visible_while_the_batch_runs`** reads the job row from a *separate database connection* while the worker runs. It only passes if progress is committed per resume. Verified by moving the commit outside the loop and watching it fail.
+- **`test_batch_embedding_is_never_called_on_rerank`** counts calls. Re-ranking that quietly re-embedded every resume would return identical output while being unusably slow — output assertions cannot catch it.
+- **`test_model_is_constructed_only_once`** swaps in a fake and counts constructions, so "loaded once per worker process" is a checked claim rather than an accident of caching.
+- **`test_every_setting_is_documented`** diffs `Settings` against `.env.example`. It has already caught four undocumented settings.
+- **The whole suite runs against an empty offline model cache** — proof that no test downloads the model.
 
-A resume that is corrupt, empty, an unsupported type, or has no extractable text is
-recorded as a failed candidate with a reason and reported under `failures` in the
-results. The rest of the batch still processes and ranks.
+```bash
+pytest                                    # 382 backend
+ruff check . && black --check .
+cd frontend && npm run build && npm run lint
+```
 
-## Notes and deviations
+---
 
-- **Object storage vars are `S3_*`, not `MINIO_*`**, so the same config works against
-  real AWS S3 by leaving `S3_ENDPOINT` empty. The MinIO container still uses
-  `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`, which the image requires.
-- **`candidates.name` was added** to the spec's table shape: section 8 shows a
-  candidate name in the results table but section 4 defines no such column. It is
-  filled from the resume's header line, with spaCy NER and then the filename as
-  fallbacks. Position leads because `en_core_web_sm` misses many non-Western names.
-- **`scoring_runs` was added** so `/rerank` preserves history instead of overwriting
-  the previous ranking.
-- **`EMBEDDING_DEVICE` is pinned to `cpu`.** sentence-transformers otherwise selects
-  MPS on macOS, and a torch model initialised on MPS crashes as soon as Celery's
-  prefork pool forks a child — the worker then respawns children endlessly. Only set
-  `mps`/`cuda` with a non-forking pool (`--pool=solo` or `--pool=threads`).
-- **The screening task is bound with `@celery_app.task`, not `@shared_task`.** A shared
-  task resolves against whatever "current app" exists in the calling process, which in
-  the API is Celery's default app pointing at `amqp://` — dispatch then fails trying to
-  reach RabbitMQ.
-- **Object storage is now load-bearing.** With processing in the worker, uploaded bytes
-  live only in MinIO/S3, so an outage at upload time returns `503` rather than accepting
-  a job that is certain to fail. A single failed object still fails only that candidate.
-- **Rerank runs inline, not through Celery.** It is one embedding call plus a scoring
-  pass, so queuing it would add more latency than it saves and force the client to poll
-  for something that answers in milliseconds.
-- **Deployed environments refuse to start on the dev credentials.** `POSTGRES_PASSWORD`,
-  `S3_ACCESS_KEY` and `S3_SECRET_KEY` have local defaults so `docker compose up` needs no
-  setup; with `APP_ENV=staging` or `production` those exact values are rejected at
-  startup, so a forgotten secret fails loudly instead of silently shipping a known password.
-- **The API warms the embedding model at startup** (`WARM_MODELS_ON_STARTUP`). Rerank
-  embeds the JD in-process, and loading the model lazily made the first rerank after a
-  deploy take ~9s. The tradeoff is that an API replica holds the model in memory
-  alongside the workers.
+## ⚠️ Known limitations
+
+> **Resume parsing is heuristics, not guarantees.**
+> Column detection, name extraction and date parsing are tuned against common layouts. Three-column or heavily graphical resumes degrade to single-column reading order — still usable, not ideal.
+
+> **The bulk target is designed for, not yet proven.**
+> The async path exists so 100+ resume uploads never time out. The largest batch actually measured end to end is 23. It should hold; it has not been benchmarked.
+
+> **Celery runs eagerly in tests.**
+> Task bodies are fully exercised, but fork-related behaviour — the kind that produced a real worker-respawn bug during development — is only caught by running a live worker.
+
+> **`/docs` and `/openapi.json` are public.**
+> They expose the API shape, not data. Worth locking down before anything sensitive is deployed.
+
+---
+
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:171717,100:F59E0B&height=120&section=footer" width="100%"/>
+
+**Built by [Rohan](https://github.com/rohan1460)**
+
+*Explainable by construction — every score shows its working.*
+
+<br/>
+
+⭐ **If this was interesting, a star helps.** ⭐
+
+</div>
