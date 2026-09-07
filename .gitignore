@@ -1,0 +1,23 @@
+# Secrets: .env holds the API key and real passwords. The negation keeps the
+# committed template, so a future .env.production can never slip through.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/

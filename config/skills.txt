@@ -1,0 +1,244 @@
+# Skills dictionary for PhraseMatcher.
+# One skill per line. Blank lines and lines starting with '#' are ignored.
+# Matching is case-insensitive. Extend this file to tune extraction for your roles;
+# override the path with SKILLS_DICTIONARY_PATH.
+#
+# Use "canonical | alias | alias" to fold synonyms onto one canonical name, so a
+# resume saying "postgres" and a JD saying "PostgreSQL" agree.
+
+# --- Languages ---
+Python
+Java
+JavaScript | JS
+TypeScript | TS
+Go | Golang
+Rust
+C++
+C#
+C
+Ruby
+PHP
+Swift
+Kotlin
+Scala
+R
+MATLAB
+Perl
+Bash | Shell Scripting
+SQL
+
+# --- Web / backend frameworks ---
+FastAPI
+Django
+Flask
+Pyramid
+Node.js | NodeJS | Node
+Express.js | Express
+NestJS
+Spring Boot | Spring
+Ruby on Rails | Rails
+Laravel
+ASP.NET
+GraphQL
+REST API | REST | RESTful API
+gRPC
+WebSockets
+Microservices
+
+# --- Frontend ---
+React | React.js | ReactJS
+Next.js | NextJS
+Vue.js | Vue | VueJS
+Angular
+Svelte
+Redux
+HTML
+CSS
+SASS | SCSS
+Tailwind CSS | Tailwind
+Vite
+Webpack
+Jest
+Cypress
+Playwright
+
+# --- Databases ---
+PostgreSQL | Postgres
+MySQL
+SQLite
+MongoDB
+Redis
+Elasticsearch
+Cassandra
+DynamoDB
+Neo4j
+Snowflake
+BigQuery
+Redshift
+pgvector
+Pinecone
+Weaviate
+
+# --- Cloud / infra ---
+AWS | Amazon Web Services
+Azure | Microsoft Azure
+GCP | Google Cloud Platform | Google Cloud
+Docker
+Kubernetes | K8s
+Terraform
+Ansible
+Helm
+Jenkins
+GitHub Actions
+GitLab CI
+CircleCI
+CI/CD
+Nginx
+Linux
+Serverless
+Lambda | AWS Lambda
+S3
+EC2
+CloudFormation
+Prometheus
+Grafana
+Datadog
+OpenTelemetry
+
+# --- Data / ML ---
+Machine Learning | ML
+Deep Learning
+Natural Language Processing | NLP
+Computer Vision
+PyTorch
+TensorFlow
+Keras
+scikit-learn | sklearn
+pandas
+NumPy
+SciPy
+spaCy
+NLTK
+Hugging Face | HuggingFace | Transformers
+LangChain
+XGBoost
+LightGBM
+OpenCV
+Apache Spark | Spark | PySpark
+Hadoop
+Kafka | Apache Kafka
+Airflow | Apache Airflow
+dbt
+ETL
+Data Warehousing
+Feature Engineering
+MLOps
+Model Deployment
+A/B Testing
+Statistics
+Data Visualization
+Tableau
+Power BI
+Matplotlib
+LLM | Large Language Models
+RAG | Retrieval Augmented Generation
+Vector Database | Vector Search
+Embeddings
+Recommender Systems
+Time Series Analysis
+
+# --- Queues / async ---
+Celery
+RabbitMQ
+SQS
+Async Programming | Asyncio
+
+# --- Practices / tooling ---
+Git
+Agile
+Scrum
+Kanban
+Test Driven Development | TDD
+Unit Testing
+Integration Testing
+pytest
+Code Review
+System Design
+Distributed Systems
+Design Patterns
+Object Oriented Programming | OOP
+Functional Programming
+Performance Optimization
+Security
+OAuth
+JWT
+Authentication
+Authorization
+Web Scraping
+API Design
+Technical Documentation
+
+# --- QA / testing ---
+Selenium
+Appium
+Cypress
+Playwright
+JMeter
+TestNG
+JUnit
+Cucumber
+Test Automation | Automation Testing
+Manual Testing
+Regression Testing
+API Testing
+Performance Testing | Load Testing
+Smoke Testing
+End to End Testing | E2E Testing
+Test Planning
+Test Cases | Test Case Design
+Bug Tracking | Defect Tracking
+Behaviour Driven Development | BDD
+Quality Assurance | QA
+Accessibility Testing
+Cross Browser Testing
+Mobile Testing
+
+# --- Collaboration tools ---
+Jira
+Confluence
+Slack
+Notion
+Figma
+Postman
+Swagger | OpenAPI
+Sentry
+PagerDuty
+
+# --- Soft / role skills ---
+Team Leadership | Leadership
+Mentoring | Coaching
+Project Management
+Product Management
+Stakeholder Management
+Communication | Written Communication | Verbal Communication
+Problem Solving
+Critical Thinking
+Analytical Skills
+Cross-functional Collaboration | Collaboration
+Teamwork
+Adaptability | Flexibility
+Time Management
+Attention to Detail
+Decision Making
+Conflict Resolution
+Negotiation
+Presentation Skills | Public Speaking
+Customer Focus | Client Management
+Hiring | Interviewing | Recruiting
+Performance Management
+Strategic Planning
+Ownership | Accountability
+Creativity
+Continuous Learning
+Remote Collaboration
+Empathy

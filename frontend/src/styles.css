@@ -1,0 +1,1164 @@
+/*
+ * Design language borrowed from Mandi: neutral base, a single amber accent, Geist
+ * type, pill controls, and animation that stays in CSS so it costs no JS.
+ * Semantic colour is reserved — emerald means matched, red means missing — so a
+ * recruiter can read a row without reading the header.
+ */
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --hero: #f6f4f1;
+  --text: #171717;
+  --muted: #737373;
+  --faint: #a3a3a3;
+  --border: #e5e5e5;
+  --border-soft: #f0f0f0;
+  --hover: #fafafa;
+
+  --accent: #f59e0b; /* amber-500 — the one brand colour */
+  --accent-text: #b45309; /* amber-700, legible on light */
+
+  --matched-bg: #ecfdf5;
+  --matched-fg: #065f46;
+  --missing-bg: #fef2f2;
+  --missing-fg: #991b1b;
+  --danger: #b91c1c;
+
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --surface: #0a0a0a;
+    --hero: #171717;
+    --text: #ededed;
+    --muted: #a3a3a3;
+    --faint: #737373;
+    --border: #262626;
+    --border-soft: #1c1c1c;
+    --hover: #131313;
+
+    --accent-text: #fbbf24;
+    --matched-bg: #052e21;
+    --matched-fg: #6ee7b7;
+    --missing-bg: #300f0f;
+    --missing-fg: #fca5a5;
+    --danger: #f87171;
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    'Geist',
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  font-size: 16.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- entrance, staggered by an inline animation-delay --- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Documents drifting behind the hero. One keyframe serves the whole field; each
+   sheet sets its own distance, tilt and timing through custom properties. */
+@keyframes drift {
+  from {
+    transform: translate3d(0, var(--drift-from), 0) rotate(var(--tilt-from));
+  }
+  to {
+    transform: translate3d(0, var(--drift-to), 0) rotate(var(--tilt-to));
+  }
+}
+
+.sheet {
+  position: absolute;
+  border-radius: 4px;
+  background: linear-gradient(160deg, #ffffff 0%, #f2efe9 100%);
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  box-shadow: 0 6px 18px rgba(120, 113, 108, 0.1);
+  animation: drift var(--drift-duration) ease-in-out infinite alternate;
+  animation-delay: var(--drift-delay);
+  will-change: transform;
+}
+
+/* A scored corner, so the shapes read as résumés rather than blank cards. */
+.sheet::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-width: 0 0 10px 10px;
+  border-style: solid;
+  border-color: transparent transparent rgba(245, 158, 11, 0.55) transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sheet {
+    background: linear-gradient(160deg, #262626 0%, #1a1a1a 100%);
+    border-color: rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .sheet {
+    animation: none;
+  }
+}
+
+/* --- layout --- */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px 64px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- nav: sticky, blurred, brand left, status right --- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+}
+
+.nav__inner {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  /* A wordmark, so it sits a step above body text rather than inheriting it. */
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+
+  /* It is a button, but it should read as a wordmark until you reach for it. */
+  padding: 6px 12px 6px 8px;
+  margin-left: -8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.nav__brand:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border);
+}
+
+.nav__brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Already home: still the wordmark, just nothing to click. */
+.nav__brand:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.nav__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 14.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.dot--live {
+  background: #10b981;
+}
+
+/* --- hero --- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--hero);
+  margin: 12px 0 20px;
+}
+
+.hero__wash,
+.hero__grid,
+.hero__sheets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hero__wash {
+  background-image:
+    radial-gradient(circle at 50% -10%, rgba(245, 158, 11, 0.18), transparent 60%),
+    radial-gradient(circle at 85% 20%, rgba(120, 113, 108, 0.1), transparent 45%);
+  opacity: 0.55;
+}
+
+.hero__grid {
+  background-image: radial-gradient(#a8a29e 0.5px, transparent 0.5px);
+  background-size: 22px 22px;
+  opacity: 0.35;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero__wash {
+    opacity: 0.25;
+  }
+  .hero__grid {
+    opacity: 0.12;
+  }
+}
+
+.hero__body {
+  position: relative;
+  z-index: 1;
+  padding: 56px 24px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 7px 16px;
+  font-size: 14.5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.hero h1 {
+  margin: 20px 0 0;
+  max-width: 30ch;
+  font-weight: 500;
+  font-size: clamp(32px, 5.6vw, 52px);
+  line-height: 1.07;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.hero__lede {
+  margin: 14px 0 0;
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: clamp(16px, 2.4vw, 19px);
+  text-wrap: pretty;
+}
+
+/* --- cards --- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+}
+
+.card h2 {
+  margin: 0 0 16px;
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 14.5px;
+}
+
+.mono {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14.5px;
+}
+
+.error-text {
+  color: var(--danger);
+}
+
+/* --- forms --- */
+.field {
+  display: block;
+  margin-bottom: 18px;
+}
+
+.field > span {
+  display: block;
+  font-weight: 500;
+  font-size: 14.5px;
+  margin-bottom: 8px;
+}
+
+input[type='text'],
+input[type='password'],
+textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+input:disabled,
+textarea:disabled {
+  background: var(--hover);
+  color: var(--faint);
+}
+
+.jd-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* --- buttons: pills throughout --- */
+button {
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 15.5px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    opacity 0.15s;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--faint);
+  background: var(--hover);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  font-weight: 500;
+}
+
+button.primary:hover:not(:disabled) {
+  opacity: 0.88;
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.link-button:hover:not(:disabled) {
+  background: none;
+  border-color: transparent;
+  opacity: 0.75;
+}
+
+/* --- dropzone --- */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 32px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--hero);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.16s;
+}
+
+/* Matching depth to the file button beside it: a flat dropzone next to a raised
+   control reads as two different design languages on one form. */
+.dropzone {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 1px 2px rgba(28, 25, 23, 0.04);
+  transform: translateY(0);
+}
+
+.dropzone:hover:not(.dropzone--disabled) {
+  border-color: var(--faint);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 4px 14px -4px rgba(28, 25, 23, 0.12);
+}
+
+.dropzone--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--hero));
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 26px -8px rgba(245, 158, 11, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .dropzone {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .dropzone:hover:not(.dropzone--disabled) {
+    box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.6);
+  }
+
+  .dropzone--active {
+    box-shadow: 0 10px 26px -8px rgba(245, 158, 11, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropzone,
+  .dropzone:hover,
+  .dropzone--active {
+    transform: none;
+  }
+}
+
+.dropzone--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.file-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--hover);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  font-size: 14.5px;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- progress --- */
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin: 14px 0;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.progress-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+
+.status {
+  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  color: var(--muted);
+}
+
+.status--queued,
+.status--processing {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent-text);
+}
+
+.status--completed {
+  background: var(--matched-bg);
+  color: var(--matched-fg);
+}
+
+.status--failed {
+  background: var(--missing-bg);
+  color: var(--missing-fg);
+}
+
+/* --- results --- */
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.results-header h2 {
+  margin: 0;
+}
+
+.rerank-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+  background: var(--hero);
+}
+
+.required-skills {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.formula {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 16px;
+  color: var(--muted);
+  padding-top: 16px;
+  margin-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.formula strong {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -26px -26px;
+}
+
+table.results {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+
+table.results th,
+table.results td {
+  text-align: left;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+
+table.results thead th {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--hover);
+}
+
+table.results tbody tr:hover {
+  background: var(--hover);
+}
+
+table.results tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Wide enough that a full name stays on one line; the skill columns take what is
+   left, since chips wrap gracefully and names do not. */
+.col-candidate {
+  min-width: 210px;
+}
+
+.col-rank {
+  width: 58px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.col-score {
+  width: 132px;
+}
+
+.sort-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sort-button:hover:not(:disabled) {
+  background: none;
+  border-color: transparent;
+  color: var(--text);
+}
+
+.caret {
+  opacity: 0.28;
+  font-size: 11px;
+}
+
+.caret--active {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.candidate-name {
+  text-wrap: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* The number a recruiter scans first, so it leads the row. */
+.score-final {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-meter {
+  height: 4px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.score-meter__fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+/* --- chips --- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.chip--matched {
+  background: var(--matched-bg);
+  color: var(--matched-fg);
+}
+
+.chip--missing {
+  background: var(--missing-bg);
+  color: var(--missing-fg);
+}
+
+/* --- failures --- */
+.failure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.failure-list li {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--missing-bg);
+  border-radius: 8px;
+}
+
+/* --- auth --- */
+.token-gate {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* --- footer --- */
+.app-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.app-footer__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 13.5px;
+  color: var(--faint);
+}
+
+/* --- file picker ---------------------------------------------------------
+   A native file input cannot be styled, so the real control is hidden inside
+   the label. Depth comes from three stacked shadows — an inset highlight along
+   the top edge, a tight contact shadow, and a soft cast one — plus a gradient
+   that runs light-to-dark down the face. The button lifts on hover and sinks
+   on press, so the surface behaves like a physical key. */
+.file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px 11px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff 0%, #f1eee9 100%);
+  color: var(--text);
+  font-size: 15.5px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(120, 113, 108, 0.08),
+    0 1px 2px rgba(28, 25, 23, 0.09),
+    0 5px 12px -3px rgba(28, 25, 23, 0.12);
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.16s,
+    border-color 0.16s;
+}
+
+.file-button:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(120, 113, 108, 0.08),
+    0 2px 4px rgba(28, 25, 23, 0.1),
+    0 10px 22px -6px rgba(245, 158, 11, 0.35);
+}
+
+/* Pressed: sink into the page and drop the cast shadow. */
+.file-button:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgba(28, 25, 23, 0.16),
+    0 1px 1px rgba(28, 25, 23, 0.06);
+}
+
+/* The input is hidden, so the ring has to live on the label. */
+.file-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.file-button--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  background: var(--hover);
+}
+
+.file-button--disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.file-button--disabled input {
+  cursor: not-allowed;
+}
+
+/* The amber chip carries the accent so the button face can stay neutral. */
+.file-button__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+  color: #7c2d12;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 1px 2px rgba(180, 83, 9, 0.35);
+  flex-shrink: 0;
+}
+
+.file-chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--matched-bg);
+  color: var(--matched-fg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.file-chosen__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+
+.file-chosen__clear {
+  border: none;
+  background: rgba(6, 95, 70, 0.12);
+  color: inherit;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 1;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.file-chosen__clear:hover:not(:disabled) {
+  background: rgba(6, 95, 70, 0.22);
+  border-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  .file-button {
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 1px 2px rgba(0, 0, 0, 0.5),
+      0 6px 14px -4px rgba(0, 0, 0, 0.6);
+  }
+
+  .file-button:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      0 2px 4px rgba(0, 0, 0, 0.5),
+      0 10px 22px -6px rgba(245, 158, 11, 0.28);
+  }
+
+  .file-button:active {
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+  }
+
+  .file-chosen__clear {
+    background: rgba(110, 231, 183, 0.16);
+  }
+
+  .file-chosen__clear:hover:not(:disabled) {
+    background: rgba(110, 231, 183, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-button,
+  .file-button:hover,
+  .file-button:active {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* --- field header: label left, quick actions right ---------------------- */
+.field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.field__header > span {
+  font-weight: 500;
+  font-size: 14.5px;
+}
+
+.field__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small enough to sit beside a label without competing with the submit button. */
+.chip-button {
+  padding: 4px 12px;
+  font-size: 13.5px;
+  font-weight: 400;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.chip-button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+/* --- sample JD menu ----------------------------------------------------- */
+.sample-menu {
+  position: relative;
+}
+
+.chip-button__caret {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+.sample-menu__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 250px;
+  padding: 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgba(28, 25, 23, 0.08),
+    0 12px 28px -8px rgba(28, 25, 23, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: rise 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sample-menu__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sample-menu__item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: transparent;
+}
+
+.sample-menu__label {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* The technologies, so the choice can be made without opening each one. */
+.sample-menu__hint {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .sample-menu__list {
+    box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* --- WebGL hero core ----------------------------------------------------
+   Sits above the drifting sheets and below the type. Fades in when the async
+   three.js chunk has loaded, so there is no pop. */
+.hero__scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.hero__scene--ready {
+  opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero__scene--ready {
+    opacity: 0.7;
+  }
+}
+
+/* The core needs room to read as a shape rather than a smudge. */
+.hero:has(.hero__scene) .hero__body {
+  min-height: 400px;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__scene {
+    display: none;
+  }
+}

@@ -1,0 +1,143 @@
+name: resume-screening
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: rs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-resume}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resume}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_screening}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resume} -d ${POSTGRES_DB:-resume_screening}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: rs-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: rs-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: rs-api
+    restart: unless-stopped
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      <<: &app_env
+        POSTGRES_USER: ${POSTGRES_USER:-resume}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resume}
+        POSTGRES_DB: ${POSTGRES_DB:-resume_screening}
+        POSTGRES_HOST: postgres
+        POSTGRES_PORT: 5432
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+        S3_ENDPOINT: http://minio:9000
+        S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+        S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+        S3_BUCKET: ${S3_BUCKET:-resumes}
+        API_KEY: ${API_KEY:-}
+        LOG_JSON: "true"
+        APP_ENV: local
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: rs-worker
+    restart: unless-stopped
+    # --concurrency sets the number of prefork children; each loads the ML model
+    # once at process init, so raising it multiplies memory by roughly the model size.
+    command: >
+      celery -A app.worker.celery_app.celery_app worker
+      --loglevel=info --concurrency=${WORKER_CONCURRENCY:-2}
+    environment:
+      <<: *app_env
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    healthcheck:
+      # CMD-SHELL, not CMD: the exec form runs no shell, so $HOSTNAME would be passed
+      # through literally and the ping would never match this node.
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rs-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      # 127.0.0.1, not localhost: inside the container localhost resolves to ::1 first
+      # and nginx listens on IPv4 only, so the check would be refused forever.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

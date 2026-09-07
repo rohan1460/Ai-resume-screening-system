@@ -1,0 +1,17 @@
+Senior Backend Engineer
+
+We are looking for a Senior Backend Engineer to design and build the services behind
+our hiring platform.
+
+Requirements:
+- Strong Python experience, ideally with FastAPI or Django
+- Solid SQL and PostgreSQL knowledge
+- Experience with Redis and Celery for async task processing
+- Docker and Kubernetes in production
+- Familiarity with AWS
+- Good testing discipline with pytest
+- Comfortable with System Design and Distributed Systems
+
+Nice to have:
+- Machine Learning or NLP exposure
+- Experience with Elasticsearch
